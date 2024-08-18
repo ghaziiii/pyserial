@@ -14,6 +14,15 @@ import wx
 import wx.lib.newevent
 import wxSerialConfigDialog
 
+
+# for plotting
+import matplotlib.pyplot as plt
+import numpy as np
+from matplotlib.animation import FuncAnimation
+import psutil
+import collections
+
+
 try:
     unichr
 except NameError:
@@ -42,6 +51,7 @@ NEWLINE_CR = 0
 NEWLINE_LF = 1
 NEWLINE_CRLF = 2
 
+ADC_value = "500"
 
 class TerminalSetup:
     """
@@ -319,9 +329,17 @@ class TerminalFrame(wx.Frame):
         event.StopPropagation()
 
     def WriteText(self, text):
+        global ADC_value
         if self.settings.unprintable:
             text = ''.join([c if (c >= ' ' and c != '\x7f') else unichr(0x2400 + ord(c)) for c in text])
         self.text_ctrl_output.AppendText(text)
+        if text != '\r':
+            ADC_value = ADC_value + text
+        else:
+            self.text_ctrl_output.AppendText("here we got some data :" + ADC_value)
+            ADC_value = ""
+        
+
 
     def OnSerialRead(self, event):
         """Handle input from the serial port."""
@@ -352,6 +370,28 @@ class TerminalFrame(wx.Frame):
 
 # end of class TerminalFrame
 
+# function to update the data
+def my_function(i):
+    # get data
+    
+    #print("ADC value : " + str(ADC_value))
+    # convert ADC data to integer
+    int_ADC_value = int(ADC_value)
+    # convert ADC value to mV
+    # int_voltage = int((int_ADC_value * 3300) / 4095)
+    int_voltage = int_ADC_value
+    cpu.popleft()
+    #cpu.append(psutil.cpu_percent())
+    cpu.append(int_voltage)
+
+    # clear axis
+    ax.cla()
+    # plot ADC Value
+    ax.plot(cpu)
+    ax.scatter(len(cpu)-1, cpu[-1])
+    ax.text(len(cpu)-1, cpu[-1]+2, "{}mV".format(cpu[-1]))
+    ax.set_ylim(0,4000)
+
 
 class MyApp(wx.App):
     def OnInit(self):
@@ -363,5 +403,19 @@ class MyApp(wx.App):
 # end of class MyApp
 
 if __name__ == "__main__":
+    cpu = collections.deque(np.zeros(10))
+    print("CPU: {}".format(cpu))
+    # start collections with zeros
+    cpu = collections.deque(np.zeros(10))
+
+    # define and adjust figure
+    fig = plt.figure(figsize=(12,6), facecolor='#DEDEDE')
+    ax = plt.subplot(121)
+    ax.set_facecolor('#DEDEDE')
+
+    # animate
+    ani = FuncAnimation(fig, my_function, interval=200)
+    plt.ion()
+    plt.show()
     app = MyApp(0)
     app.MainLoop()
